@@ -1,0 +1,5 @@
+listen_host = "127.0.0.1"
+listen_port = 18767
+management_url = "http://127.0.0.1:8317/v0/management"
+management_key_file = "/etc/tinybar-bridge/management.key"
+cache_seconds = 300

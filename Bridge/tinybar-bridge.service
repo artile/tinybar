@@ -1,0 +1,25 @@
+[Unit]
+Description=Tinybar Claude account limits
+After=network-online.target cliproxyapi.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/tinybar-bridge/claude_accounts.py --config /etc/tinybar-bridge/config.toml
+User=tinybar-bridge
+Group=tinybar-bridge
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+UMask=0077
+Environment=PYTHONDONTWRITEBYTECODE=1
+
+[Install]
+WantedBy=multi-user.target
