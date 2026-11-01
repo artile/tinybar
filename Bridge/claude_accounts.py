@@ -96,6 +96,7 @@ class Bridge:
         self.next_poll = 0
         self.retry_at = {}
         self.previous = {}
+        self.generations = {}
 
     def _request(self, path, payload=None):
         key = self.key_file.read_text().strip()
@@ -117,6 +118,14 @@ class Bridge:
         if not identity or index is None or not str(index).strip():
             raise ValueError("account has no identity")
         account_id = hashlib.sha256(("claude:" + identity).encode()).hexdigest()[:24]
+        # A new login must not inherit a pause from the previous credential file.
+        # In-memory status changes alone do not invalidate a provider's retry delay.
+        generation = tuple(str(entry.get(field) or "") for field in ("auth_index", "modtime", "last_refresh"))
+        previous_generation = self.generations.get(account_id)
+        if previous_generation is not None and previous_generation != generation:
+            self.retry_at.pop(account_id, None)
+            self.previous.pop(account_id, None)
+        self.generations[account_id] = generation
         account = {"id": account_id, "label": text(entry.get("label")) or text(entry.get("email")) or "Claude " + account_id[:6],
                    "fetched_at": timestamp()}
         if self.clock() < self.retry_at.get(account_id, 0) and account_id in self.previous:
@@ -174,6 +183,7 @@ class Bridge:
                 raise ValueError("duplicate account identity")
             self.previous = {a["id"]: a for a in accounts}
             self.retry_at = {k: v for k, v in self.retry_at.items() if k in self.previous}
+            self.generations = {k: v for k, v in self.generations.items() if k in self.previous}
             self.cached = {"schema_version": 1, "accounts": accounts}
             self.next_poll = self.clock() + self.interval
             return self.cached

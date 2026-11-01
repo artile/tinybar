@@ -85,6 +85,50 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(len(accounts), 1)
         self.assertEqual(accounts[0]["id"], first)
 
+    def test_relogin_clears_only_the_changed_accounts_old_pause(self):
+        self.status = {"first": 429, "second": 429}
+        self.bridge.accounts()
+        self.entries[0]["modtime"] = "2030-01-01T00:05:00Z"
+        self.status["first"] = 200
+        self.now = 301
+        accounts = self.bridge.accounts()["accounts"]
+        self.assertIn("usage", accounts[0])
+        self.assertEqual(accounts[1]["error"]["code"], "rate_limited")
+        attempts = [p["auth_index"] for _, p in self.calls if p]
+        self.assertEqual(attempts.count("first"), 2)
+        self.assertEqual(attempts.count("second"), 1)
+
+    def test_refresh_metadata_change_is_detected_without_resetting_account_identity(self):
+        self.status["first"] = 429
+        account_id = self.bridge.accounts()["accounts"][0]["id"]
+        self.entries[0]["last_refresh"] = "2030-01-01T00:05:00Z"
+        self.status["first"] = 200
+        self.now = 301
+        account = self.bridge.accounts()["accounts"][0]
+        self.assertEqual(account["id"], account_id)
+        self.assertIn("usage", account)
+
+    def test_runtime_status_updates_do_not_bypass_provider_pause(self):
+        self.status["first"] = 429
+        self.bridge.accounts()
+        self.entries[0]["updated_at"] = "2030-01-01T00:05:00Z"
+        self.entries[0]["status"] = "active"
+        self.now = 301
+        self.bridge.accounts()
+        attempts = [p["auth_index"] for _, p in self.calls if p]
+        self.assertEqual(attempts.count("first"), 1)
+
+    def test_relogin_still_honors_a_new_rate_limit_response(self):
+        self.status["first"] = 429
+        self.bridge.accounts()
+        self.entries[0]["modtime"] = "2030-01-01T00:05:00Z"
+        self.now = 301
+        self.bridge.accounts()
+        self.now = 602
+        self.bridge.accounts()
+        attempts = [p["auth_index"] for _, p in self.calls if p]
+        self.assertEqual(attempts.count("first"), 2)
+
     def test_retry_after_http_date_and_long_delays_are_not_shortened(self):
         self.status["first"] = 429
         self.retry = format_datetime(datetime.now(timezone.utc) + timedelta(days=2), usegmt=True)

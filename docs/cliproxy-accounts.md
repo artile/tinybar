@@ -78,6 +78,8 @@ The upstream Developer ID signature and notarization do not apply to the fork.
 - Auto selects across fresh account-wide limits. An explicit pin can retain a stale account.
 - A changed label does not change the account ID, pin, or alert cycle.
 - The server caches results for at least five minutes and honors account-specific retry delays.
+- A changed account file or refresh timestamp clears that account's old pause at the next poll.
+- A new rate-limit response starts a new pause. Runtime status changes do not clear a pause.
 - A manual check can read the cached result. It does not bypass a provider delay.
 - Local Claude Code history remains combined across accounts.
 - Plan Value does not assign combined local tokens to one proxy account.

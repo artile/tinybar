@@ -34,3 +34,11 @@ The fork does not change or refresh that login.
 - Tests checked weekly selection, model-specific exclusion, missing readings, stale readings, and both account positions.
 - The installed app uses this mode by default for Claude proxy accounts.
 - Selecting a single pinned limit leaves weekly mode.
+
+## Login recovery fix
+
+- All 14 bridge tests passed, including four new login recovery cases.
+- A changed account file or refresh timestamp now clears that account's old retry delay.
+- Runtime status changes preserve the delay. A new HTTP 429 starts a new delay.
+- After deployment, both live Claude accounts returned fresh weekly limits through the Mac tunnel.
+- Tinybar restarted with weekly mode enabled. Native menu rendering showed both percentages.
