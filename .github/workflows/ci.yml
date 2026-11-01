@@ -20,5 +20,7 @@ jobs:
         run: swift build
       - name: Test
         run: swift test
+      - name: Test the account bridge
+        run: python3 -m unittest discover -s Bridge -v
       - name: Build the app bundle
         run: ./Scripts/build-app.sh

@@ -26,7 +26,7 @@ public struct LimitAlertPlanner: Codable, Sendable, Equatable {
     public mutating func evaluate(_ snapshot: ProviderSnapshot, now: Date = Date()) -> [Alert] {
         var alerts: [Alert] = []
         for w in snapshot.windows where !w.isModelSpecific && (w.kind == .session || w.kind == .weekly) {
-            let key = "\(snapshot.provider.rawValue)/\(w.id)"
+            let key = LimitSelection.key(provider: snapshot.provider, accountID: snapshot.accountID, windowID: w.id)
             var state = cycles[key] ?? CycleState(resetsAt: w.resetsAt, notified: [])
 
             let observedReset = !state.notified.isEmpty && w.usedPercent == 0

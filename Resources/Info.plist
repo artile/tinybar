@@ -3,24 +3,26 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDisplayName</key>
-	<string>Tinybar</string>
+	<string>Tinybar Fleet</string>
 	<key>CFBundleExecutable</key>
 	<string>Tinybar</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.tinybar.app</string>
+	<string>io.tao.tinybar.fleet</string>
 	<key>CFBundleName</key>
 	<string>Tinybar</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.7.0</string>
+	<string>0.7.0-fleet.1</string>
 	<key>CFBundleVersion</key>
 	<string>18</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<key>LSUIElement</key>
+	<true/>
+	<key>TinybarFleetBuild</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>MIT License</string>

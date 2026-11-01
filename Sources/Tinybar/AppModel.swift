@@ -17,6 +17,9 @@ struct ProviderState {
 @Observable
 final class AppModel {
     private(set) var providers: [ProviderID: ProviderState] = [:]
+    private(set) var claudeAccounts: [ClaudeProxyAccount] = []
+    var usesClaudeProxy: Bool { settings.claudeProxyEnabled }
+    private var claudeSourceRevision = 0
     /// Keep Retry-After and the last attempt when a Provider is toggled off and on.
     private var disabledProviders: [ProviderID: ProviderState] = [:]
     /// All Providers together, for the overview.
@@ -69,7 +72,7 @@ final class AppModel {
         store = try? ProcessInfo.processInfo.environment["TINYBAR_DB"].map { try UsageStore(path: URL(fileURLWithPath: $0)) }
             ?? UsageStore()
         alertPlanner = settings.loadAlertState()
-        for (id, source) in sources where settings.isEnabled(id, detected: source.isConfigured()) {
+        for (id, source) in sources where settings.isEnabled(id, detected: (id == .claude && settings.claudeProxyEnabled) || source.isConfigured()) {
             providers[id] = ProviderState()
         }
     }
@@ -156,8 +159,11 @@ final class AppModel {
         }
 
         let now = Date()
+        let sourceRevision = claudeSourceRevision
+        async let proxyRefresh: Void = refreshClaudeAccounts(force: force, throttle: throttle)
         await withTaskGroup(of: (ProviderID, Result<ProviderSnapshot, ProviderError>)?.self) { group in
             for id in enabledProviders {
+                if id == .claude && usesClaudeProxy { continue }
                 guard let source = sources[id] else { continue }
                 let state = providers[id] ?? ProviderState()
                 if let until = state.backoffUntil, until > now { continue }
@@ -177,9 +183,11 @@ final class AppModel {
             }
             for await result in group {
                 guard let (id, outcome) = result else { continue }
+                if id == .claude && (sourceRevision != claudeSourceRevision || usesClaudeProxy) { continue }
                 apply(outcome, to: id)
             }
         }
+        await proxyRefresh
         guard !isAsleep, !isLocked else { return nil }
         await refreshIncidents(throttle: throttle)
         guard !isAsleep, !isLocked else { return nil }
@@ -187,6 +195,10 @@ final class AppModel {
             notifier.send(update: release)
         }
         guard !isAsleep, !isLocked else { return nil }
+        if CommandLine.arguments.contains("--limits-only") {
+            lastUpdated = Date()
+            return nil
+        }
         if usageTask == nil {
             usageTask = Task {
                 await refreshUsage()
@@ -195,6 +207,41 @@ final class AppModel {
             }
         }
         return usageTask
+    }
+
+    private func refreshClaudeAccounts(force: Bool, throttle: TimeInterval) async {
+        guard usesClaudeProxy, let state = providers[.claude] else { return }
+        let now = Date()
+        if let until = state.backoffUntil, until > now { return }
+        if !force, throttle > 0, let last = state.lastAttempt, now.timeIntervalSince(last) < throttle { return }
+        let revision = claudeSourceRevision
+        providers[.claude]?.lastAttempt = now
+        do {
+            let accounts = try await ClaudeProxyClient(url: settings.claudeProxyURL).fetch()
+            guard revision == claudeSourceRevision, usesClaudeProxy, providers[.claude] != nil else { return }
+            claudeAccounts = ClaudeProxyAccount.merging(accounts, previous: claudeAccounts)
+            providers[.claude]?.error = nil
+            providers[.claude]?.backoffUntil = nil
+            if settings.notificationsEnabled {
+                for account in claudeAccounts where account.error == nil {
+                    guard let snapshot = account.snapshot else { continue }
+                    for alert in alertPlanner.evaluate(snapshot) { notifier.send(alert, accountName: account.label) }
+                }
+                settings.saveAlertState(alertPlanner)
+            }
+        } catch {
+            guard revision == claudeSourceRevision, usesClaudeProxy, providers[.claude] != nil else { return }
+            let failure = (error as? ProviderError) ?? .unexpected("Could not read Claude accounts.")
+            providers[.claude]?.error = failure
+            if case let .rateLimited(retryAfter) = failure {
+                providers[.claude]?.backoffUntil = now.addingTimeInterval(retryAfter ?? Self.pollInterval)
+            }
+            claudeAccounts = claudeAccounts.map {
+                var account = $0
+                account.error = failure
+                return account
+            }
+        }
     }
 
     /// Reads the status pages of the enabled subscriptions that have one. A page that can't be
@@ -305,7 +352,7 @@ final class AppModel {
     /// Notes each fresh weekly reading, then works out what the plans buy (SPEC §14).
     private func refreshPlanValues(_ store: UsageStore) async {
         var readings: [ProviderID: [LimitReading]] = [:]
-        for id in enabledProviders where id == .claude || id == .codex {
+        for id in enabledProviders where (id == .claude && !usesClaudeProxy) || id == .codex {
             guard let state = providers[id], let snapshot = state.snapshot else { continue }
             if !state.isStale { try? await store.recordLimitReadings(snapshot) }
             readings[id] = (try? await store.limitReadings(provider: id)) ?? []
@@ -373,57 +420,53 @@ final class AppModel {
 
     // MARK: Pinned Limit
 
-    /// The window shown in the menu bar: the one the user pinned, else Auto (SPEC §6).
-    var pinned: (ProviderID, LimitWindow)? {
-        explicitPin ?? autoPinned
-    }
-
-    /// The user's pick, while its window still exists.
-    private var explicitPin: (ProviderID, LimitWindow)? {
-        guard let key = settings.pinnedLimit else { return nil }
-        let parts = key.split(separator: "/", maxSplits: 1).map(String.init)
-        guard parts.count == 2, let id = ProviderID(rawValue: parts[0]),
-              let window = providers[id]?.snapshot?.windows.first(where: { $0.id == parts[1] })
-        else { return nil }
-        return (id, window)
-    }
-
-    /// Whether the menu bar follows Auto rather than a pinned window.
-    var isAuto: Bool { explicitPin == nil }
-
-    /// Auto: of every subscription's account-wide windows, the one that runs out first before its
-    /// Reset; if none does, the one with the least left. Stale subscriptions only count when
-    /// nothing else is known.
-    private var autoPinned: (ProviderID, LimitWindow)? {
-        func candidates(stale: Bool) -> [(ProviderID, LimitWindow, Date?)] {
-            enabledProviders.flatMap { id -> [(ProviderID, LimitWindow, Date?)] in
-                guard let state = providers[id], state.isStale == stale, let snapshot = state.snapshot else { return [] }
-                return snapshot.windows.filter { !$0.isModelSpecific }.map { w in
-                    let runOut = stale ? nil : w.runOutTime(asOf: snapshot.fetchedAt).flatMap { w.runsOutBeforeReset($0) ? $0 : nil }
-                    return (id, w, runOut)
+    /// Native and remote account limits share the same pin and Auto selection rules.
+    var selectedLimit: LimitSelection? {
+        var candidates: [LimitSelection] = []
+        for id in enabledProviders {
+            if id == .claude && usesClaudeProxy { continue }
+            guard let state = providers[id], let snapshot = state.snapshot else { continue }
+            candidates += snapshot.windows.map {
+                LimitSelection(provider: id, window: $0, fetchedAt: snapshot.fetchedAt, stale: state.isStale)
+            }
+        }
+        if usesClaudeProxy, providers[.claude] != nil {
+            for account in claudeAccounts {
+                guard let snapshot = account.snapshot else { continue }
+                candidates += snapshot.windows.map {
+                    LimitSelection(provider: .claude, accountID: account.id, accountName: account.label,
+                                   window: $0, fetchedAt: snapshot.fetchedAt, stale: account.error != nil)
                 }
             }
         }
-        let fresh = candidates(stale: false)
-        let all = fresh.isEmpty ? candidates(stale: true) : fresh
-        if let first = all.filter({ $0.2 != nil }).min(by: { $0.2! < $1.2! }) { return (first.0, first.1) }
-        return all.min {
-            ($0.1.remainingPercent, $0.1.resetsAt ?? .distantFuture) < ($1.1.remainingPercent, $1.1.resetsAt ?? .distantFuture)
-        }.map { ($0.0, $0.1) }
+        return LimitSelection.choose(candidates, pinnedKey: settings.pinnedLimit)
     }
 
-    /// Pins a window; clicking the pinned window again goes back to Auto.
-    func pin(_ provider: ProviderID, _ window: LimitWindow) {
-        let key = "\(provider.rawValue)/\(window.id)"
+    var pinned: (ProviderID, LimitWindow)? { selectedLimit.map { ($0.provider, $0.window) } }
+    var isAuto: Bool { selectedLimit == nil || selectedLimit?.key != settings.pinnedLimit }
+
+    func pin(_ provider: ProviderID, _ window: LimitWindow, accountID: String? = nil) {
+        let key = LimitSelection.key(provider: provider, accountID: accountID, windowID: window.id)
         settings.pinnedLimit = settings.pinnedLimit == key && !isAuto ? nil : key
     }
 
-    func isPinned(_ provider: ProviderID, _ window: LimitWindow) -> Bool {
-        guard let p = pinned else { return false }
-        return p.0 == provider && p.1.id == window.id
+    func isPinned(_ provider: ProviderID, _ window: LimitWindow, accountID: String? = nil) -> Bool {
+        selectedLimit?.key == LimitSelection.key(provider: provider, accountID: accountID, windowID: window.id)
     }
 
     // MARK: Settings changes
+
+    /// In-flight replies from the previous URL cannot replace the newly selected source.
+    func configureClaudeProxy() {
+        claudeSourceRevision += 1
+        claudeAccounts = []
+        if providers[.claude] != nil || (usesClaudeProxy && settings.isEnabled(.claude, detected: true)) {
+            providers[.claude] = ProviderState()
+        }
+        disabledProviders[.claude] = nil
+        if isFetching { pendingRefreshThrottle = 0 }
+        else { Task { await refresh(force: true) } }
+    }
 
     func setEnabled(_ id: ProviderID, _ enabled: Bool) {
         settings.setEnabled(id, enabled)

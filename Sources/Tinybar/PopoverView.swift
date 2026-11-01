@@ -240,8 +240,18 @@ private struct OverviewPage: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(model.enabledProviders, id: \.self) { id in
-                        Button { open(id) } label: { OverviewRow(model: model, id: id) }
-                            .buttonStyle(RowButtonStyle())
+                        if id == .claude && model.usesClaudeProxy && !model.claudeAccounts.isEmpty {
+                            ForEach(model.claudeAccounts) { account in
+                                Button { open(.claude) } label: { ProxyAccountOverview(model: model, account: account) }
+                                    .buttonStyle(RowButtonStyle())
+                                if account.id != model.claudeAccounts.last?.id {
+                                    Divider().padding(.leading, 64).padding(.trailing, 12).opacity(0.5)
+                                }
+                            }
+                        } else {
+                            Button { open(id) } label: { OverviewRow(model: model, id: id) }
+                                .buttonStyle(RowButtonStyle())
+                        }
                         if id != model.enabledProviders.last {
                             Divider().padding(.leading, 64).padding(.trailing, 12).opacity(0.5)
                         }
@@ -291,7 +301,7 @@ private struct OverviewRow: View {
             if let binding {
                 PercentText(percent: binding.remainingPercent, size: 20)
                     .opacity(stale ? 0.5 : 1)
-            } else if snapshot == nil, state?.error == nil {
+            } else if snapshot == nil, state?.error == nil, !(id == .claude && model.usesClaudeProxy && !model.isRefreshing) {
                 ProgressView().controlSize(.small)
             }
             Image(systemName: "chevron.right")
@@ -306,7 +316,7 @@ private struct OverviewRow: View {
     @ViewBuilder
     private func subtitle(state: ProviderState?, snapshot: ProviderSnapshot?, binding: LimitWindow?) -> some View {
         if let error = state?.error {
-            Label(StaleText.short(id: id, error: error), systemImage: "exclamationmark.triangle.fill")
+            Label(id == .claude && model.usesClaudeProxy ? "Account service unavailable" : StaleText.short(id: id, error: error), systemImage: "exclamationmark.triangle.fill")
                 .labelStyle(TightLabel())
                 .foregroundStyle(.orange)
         } else if let incident = model.incidents[id]?.first {
@@ -324,6 +334,8 @@ private struct OverviewRow: View {
         } else if state?.snapshot != nil {
             Text(snapshot?.windows.isEmpty == false ? "Model-specific limits only" : "No limits reported")
                 .foregroundStyle(.secondary)
+        } else if id == .claude && model.usesClaudeProxy && !model.isRefreshing {
+            Text("No enabled Claude accounts").foregroundStyle(.secondary)
         } else {
             Text("Checking…").foregroundStyle(.secondary)
         }
@@ -385,43 +397,166 @@ private struct ProviderPage: View {
     let id: ProviderID
 
     var body: some View {
-        let state = model.providers[id]
-        let snapshot = state?.snapshot
-        let stale = state?.isStale ?? false
+        if id == .claude && model.usesClaudeProxy {
+            ProxyClaudePage(model: model)
+        } else {
+            let state = model.providers[id]
+            let snapshot = state?.snapshot
+            let stale = state?.isStale ?? false
 
-        VStack(alignment: .leading, spacing: 14) {
-            Hero(id: id, state: state)
+            VStack(alignment: .leading, spacing: 14) {
+                Hero(id: id, state: state)
 
-            ForEach(model.incidents[id] ?? [], id: \.self) { IncidentBanner(incident: $0) }
+                ForEach(model.incidents[id] ?? [], id: \.self) { IncidentBanner(incident: $0) }
 
-            if let error = state?.error {
-                StaleBanner(id: id, error: error, since: snapshot?.fetchedAt)
-            }
+                if let error = state?.error {
+                    StaleBanner(id: id, error: error, since: snapshot?.fetchedAt)
+                }
 
-            if let windows = snapshot?.windows, !windows.isEmpty {
-                VStack(spacing: 0) {
-                    ForEach(windows) { window in
-                        WindowRow(
-                            window: window, provider: id,
-                            runOut: stale ? nil : snapshot.flatMap { window.runOutTime(asOf: $0.fetchedAt) },
-                            pinned: model.isPinned(id, window), auto: model.isAuto, dimmed: stale
-                        ) { model.pin(id, window) }
-                        if window.id != windows.last?.id {
-                            Divider().padding(.horizontal, 14).opacity(0.5)
+                if let windows = snapshot?.windows, !windows.isEmpty {
+                    VStack(spacing: 0) {
+                        ForEach(windows) { window in
+                            WindowRow(
+                                window: window, provider: id,
+                                runOut: stale ? nil : snapshot.flatMap { window.runOutTime(asOf: $0.fetchedAt) },
+                                pinned: model.isPinned(id, window), auto: model.isAuto, dimmed: stale
+                            ) { model.pin(id, window) }
+                            if window.id != windows.last?.id {
+                                Divider().padding(.horizontal, 14).opacity(0.5)
+                            }
                         }
                     }
+                    .platter(cornerRadius: 16)
                 }
-                .platter(cornerRadius: 16)
-            }
 
-            if let snapshot, snapshot.hasExtras {
-                Extras(snapshot: snapshot)
-            }
+                if let snapshot, snapshot.hasExtras {
+                    Extras(snapshot: snapshot)
+                }
 
-            if let summaries = model.providerUsage[id] {
+                if let summaries = model.providerUsage[id] {
+                    UsagePanel(model: model, summaries: summaries)
+                }
+            }
+        }
+    }
+}
+
+/// Account cards never attach combined local history to a single subscription.
+private struct ProxyClaudePage: View {
+    let model: AppModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("Claude accounts").font(.system(size: 22, weight: .bold, design: .rounded))
+                Spacer()
+                Text("CLIProxyAPI").font(.system(size: 11)).foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 4)
+            ForEach(model.incidents[.claude] ?? [], id: \.self) { IncidentBanner(incident: $0) }
+            if let error = model.providers[.claude]?.error {
+                ProxyAccountMessage(error: error, since: nil)
+            }
+            if model.claudeAccounts.isEmpty && !model.isRefreshing && model.providers[.claude]?.error == nil {
+                Text("No enabled Claude accounts in CLIProxyAPI.")
+                    .font(.system(size: 12)).foregroundStyle(.secondary).padding(14).platter()
+            }
+            ForEach(model.claudeAccounts) { account in
+                VStack(alignment: .leading, spacing: 9) {
+                    HStack(alignment: .top, spacing: 8) {
+                        ProviderDot(id: .claude, size: 7).padding(.top, 4)
+                        Text(PopoverSnapshotOptions.accountLabel(account.label, id: account.id, accounts: model.claudeAccounts))
+                            .font(.system(size: 13, weight: .semibold)).textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 4)
+                    if let error = account.error {
+                        ProxyAccountMessage(error: error, since: account.snapshot?.fetchedAt)
+                    }
+                    if let snapshot = account.snapshot {
+                        VStack(spacing: 0) {
+                            ForEach(snapshot.windows) { window in
+                                WindowRow(window: window, provider: .claude,
+                                          runOut: account.error == nil ? window.runOutTime(asOf: snapshot.fetchedAt) : nil,
+                                          pinned: model.isPinned(.claude, window, accountID: account.id),
+                                          auto: model.isAuto, dimmed: account.error != nil) {
+                                    model.pin(.claude, window, accountID: account.id)
+                                }
+                                if window.id != snapshot.windows.last?.id {
+                                    Divider().padding(.horizontal, 14).opacity(0.5)
+                                }
+                            }
+                        }
+                        .platter(cornerRadius: 16)
+                        if snapshot.hasExtras { Extras(snapshot: snapshot) }
+                    }
+                }
+            }
+            if let summaries = model.providerUsage[.claude] {
+                Text("Local Claude Code history · all accounts")
+                    .font(.system(size: 11)).foregroundStyle(.secondary).padding(.horizontal, 4)
                 UsagePanel(model: model, summaries: summaries)
             }
         }
+    }
+}
+
+private struct ProxyAccountOverview: View {
+    let model: AppModel
+    let account: ClaudeProxyAccount
+
+    var body: some View {
+        let snapshot = account.snapshot
+        let stale = account.error != nil
+        let binding = (stale ? nil : snapshot?.firstRunOut(includeModelSpecific: false)?.window) ?? snapshot?.bindingWindow
+        HStack(spacing: 12) {
+            LimitRings(windows: snapshot?.ringWindows ?? [], provider: .claude, lineWidth: 4, gap: 1.5, dimmed: stale)
+                .frame(width: 38, height: 38)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
+                    Text("Claude").font(.system(size: 14, weight: .semibold))
+                    if model.selectedLimit?.accountID == account.id {
+                        Image(systemName: "pin.fill").font(.system(size: 9)).foregroundStyle(.tertiary)
+                    }
+                }
+                Text(PopoverSnapshotOptions.accountLabel(account.label, id: account.id, accounts: model.claudeAccounts))
+                    .font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                if let error = account.error {
+                    Text(StaleText.short(id: .claude, error: error)).font(.system(size: 11)).foregroundStyle(.orange)
+                } else if let binding {
+                    Text(ResetText.short(binding)).font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+            }
+            Spacer(minLength: 4)
+            if let binding { PercentText(percent: binding.remainingPercent, size: 20).opacity(stale ? 0.5 : 1) }
+            Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold)).foregroundStyle(.quaternary)
+        }
+        .padding(.vertical, 10).padding(.horizontal, 12).contentShape(Rectangle())
+    }
+}
+
+private struct ProxyAccountMessage: View {
+    let error: ProviderError
+    let since: Date?
+
+    private var message: String {
+        switch error {
+        case .loginExpired, .notConfigured: "The server login expired. Renew this account in CLIProxyAPI."
+        case .rateLimited: "Claude asked this account to wait. The server will check again after the pause."
+        case .network: "Could not reach the account service. Check the SSH tunnel and server."
+        case let .unexpected(message): message
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Label(message, systemImage: "exclamationmark.triangle.fill")
+                .fixedSize(horizontal: false, vertical: true)
+            if let since { Text("Last reading: \(since.formatted(date: .abbreviated, time: .shortened))").foregroundStyle(.secondary) }
+        }
+        .font(.system(size: 11)).foregroundStyle(.orange).padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading).platter()
     }
 }
 
@@ -884,6 +1019,20 @@ private struct SettingsPage: View {
                     }
                 }
             }
+            SettingsSection("Claude accounts", footer: "The account service reads CLIProxyAPI on the server. OAuth tokens stay there. Local token history combines all accounts.") {
+                SettingsToggle(isOn: Binding(
+                    get: { settings.claudeProxyEnabled },
+                    set: { settings.claudeProxyEnabled = $0; model.configureClaudeProxy() }), first: true) {
+                    Text("Use CLIProxyAPI accounts")
+                }
+                if settings.claudeProxyEnabled {
+                    Divider().padding(.leading, 14)
+                    TextField("Account service URL", text: $settings.claudeProxyURL)
+                        .textFieldStyle(.roundedBorder).font(.system(size: 11))
+                        .onSubmit { model.configureClaudeProxy() }
+                        .padding(14)
+                }
+            }
             SettingsSection(
                 "Browser fallback",
                 footer: "When a CLI login is missing or expired, read your signed-in browser session instead. Chromium browsers ask once for Keychain access.")
@@ -914,7 +1063,9 @@ private struct SettingsPage: View {
                 SettingsToggle(isOn: Binding(
                     get: { model.isAuto },
                     set: { auto in
-                        if auto { settings.pinnedLimit = nil } else if let (id, w) = model.pinned { model.pin(id, w) }
+                        if auto { settings.pinnedLimit = nil } else if let (id, w) = model.pinned {
+                            model.pin(id, w, accountID: model.selectedLimit?.accountID)
+                        }
                     }))
                 {
                     Text("Show the limit closest to running out")
@@ -939,7 +1090,7 @@ private struct SettingsPage: View {
     /// The bug report form on GitHub, with the version fields filled in from their ids.
     private var bugReportURL: URL {
         let os = ProcessInfo.processInfo.operatingSystemVersion
-        var url = URLComponents(string: "https://github.com/ThiloReintjes/tinybar/issues/new")!
+        var url = URLComponents(string: "https://github.com/artile/tinybar/issues/new")!
         url.queryItems = [
             URLQueryItem(name: "template", value: "bug_report.yml"),
             URLQueryItem(name: "version", value: model.updater.current),

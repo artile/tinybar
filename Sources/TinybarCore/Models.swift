@@ -157,6 +157,8 @@ public enum DataSource: String, Codable, Sendable, Hashable {
 
 public struct ProviderSnapshot: Codable, Sendable, Hashable {
     public var provider: ProviderID
+    /// Set only for limits from a named proxy account. Local history stays provider-wide.
+    public var accountID: String?
     public var plan: String?
     public var windows: [LimitWindow]
     public var credits: Credits?

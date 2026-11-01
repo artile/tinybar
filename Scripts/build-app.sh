@@ -11,7 +11,7 @@ cd "$(dirname "$0")/.."
 swift build -c release --product Tinybar --arch arm64 --arch x86_64
 BIN=".build/apple/Products/Release/Tinybar"
 
-APP="build/Tinybar.app"
+APP="build/Tinybar Fleet.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Tinybar"

@@ -2,6 +2,11 @@
 
 # Tinybar
 
+This is **Tinybar Fleet**, a fork of [ThiloReintjes/tinybar](https://github.com/ThiloReintjes/tinybar).
+It adds separate Claude account cards from CLIProxyAPI through a read-only server bridge.
+See [setup, limits, and tests](docs/cliproxy-accounts.md).
+The upstream install instructions below install the original app, not this fork.
+
 **See what's left of your Claude, Codex, Gemini and Cursor limits from the macOS menu bar, plus the
 tokens you used and what they would have cost at API prices.**
 
@@ -110,8 +115,8 @@ Measured on Apple silicon with 16 GB of Codex logs and 8 GB of Claude transcript
 Needs macOS 14 or later and Swift 6 (Xcode 16 or newer). There is no Xcode project.
 
 ```sh
-git clone https://github.com/ThiloReintjes/tinybar.git && cd tinybar
-./Scripts/build-app.sh && open build/Tinybar.app
+git clone https://github.com/artile/tinybar.git && cd tinybar
+./Scripts/build-app.sh
 swift test
 ```
 

@@ -38,6 +38,7 @@ final class Updater {
     }
 
     init() {
+        guard Bundle.main.object(forInfoDictionaryKey: "TinybarFleetBuild") as? Bool != true else { return }
         // A failed swap leaves a marker for the relaunched old version to explain.
         if let reason = try? String(contentsOf: marker, encoding: .utf8) {
             try? FileManager.default.removeItem(at: marker)
@@ -74,6 +75,7 @@ final class Updater {
     /// Asks GitHub when `UpdateSchedule` says it's time. Returns a release seen for the first
     /// time, to notify about once.
     func checkIfDue(now: Date = Date()) async -> Release? {
+        guard Bundle.main.object(forInfoDictionaryKey: "TinybarFleetBuild") as? Bool != true else { return nil }
         guard let current, schedule.isDue(now: now, version: current) else { return nil }
         schedule.attempt(at: now, version: current)
         guard let latest = try? await ReleaseCheck.latest() else { return nil }

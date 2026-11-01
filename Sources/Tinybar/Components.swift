@@ -368,6 +368,10 @@ extension ExtraUsageSpend {
 
 /// Developer snapshot switches (`--snapshot … --redact-projects` for public screenshots).
 enum PopoverSnapshotOptions {
+    static func accountLabel(_ label: String, id: String, accounts: [ClaudeProxyAccount]) -> String {
+        guard CommandLine.arguments.contains("--redact-projects") else { return label }
+        return "Account \((accounts.firstIndex(where: { $0.id == id }) ?? 0) + 1)"
+    }
     static let redactProjects = CommandLine.arguments.contains("--redact-projects")
 
     static func projects(_ lines: [UsageSummary.Line]) -> [UsageSummary.Line] {

@@ -16,7 +16,7 @@ final class Notifier {
         center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
-    func send(_ alert: LimitAlertPlanner.Alert) {
+    func send(_ alert: LimitAlertPlanner.Alert, accountName: String? = nil) {
         guard let center else { return }
         let content = UNMutableNotificationContent()
         switch alert {
@@ -29,6 +29,7 @@ final class Notifier {
             content.title = "\(provider.displayName) \(window) limit reset"
             content.body = "You're back to full capacity."
         }
+        if let accountName { content.subtitle = accountName }
         content.sound = .default
         center.add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
     }

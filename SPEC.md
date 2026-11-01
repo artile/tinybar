@@ -1,5 +1,9 @@
 # Tinybar — v1 Specification
 
+The Fleet fork adds multiple Claude accounts through a read-only CLIProxyAPI bridge.
+[Fleet setup](docs/cliproxy-accounts.md) and [ADR 0008](docs/adr/0008-cliproxy-claude-accounts.md) define this extension.
+The remaining specification describes the upstream app.
+
 A lightweight, native macOS menu bar app showing AI subscription limits, local token usage over time, and the Theoretical Cost of that usage. It is a from-scratch alternative to [CodexBar](https://github.com/steipete/CodexBar) (about 309k LOC, 87 providers), built around performance and a small scope.
 
 Vocabulary: see [CONTEXT.md](./CONTEXT.md). Decisions: [docs/adr/](./docs/adr), above all [ADR 0001](./docs/adr/0001-read-only-credentials.md) (read-only credentials).

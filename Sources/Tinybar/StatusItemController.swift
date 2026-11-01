@@ -64,7 +64,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
 
     private func render() {
         let pinned = model.pinned
-        let stale = pinned.map { model.providers[$0.0]?.isStale ?? false } ?? false
+        let stale = model.selectedLimit?.stale ?? false
         guard let button = statusItem.button else { return }
         let key = RenderKey(
             percent: pinned.map { Int($0.1.remainingPercent.rounded()) },
@@ -74,6 +74,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             dark: button.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua,
             alert: model.disruption?.severity)
         var tip = pinned.map { "\($0.0.displayName) \($0.1.title): \(Int($0.1.remainingPercent.rounded()))% left" }
+        if let account = model.selectedLimit?.accountName { tip = tip.map { "\(account)\n\($0)" } }
         if let incident = model.disruption {
             tip = [tip, "\(incident.provider.displayName): \(incident.title)"].compactMap { $0 }.joined(separator: "\n")
         }

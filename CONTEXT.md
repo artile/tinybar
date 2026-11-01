@@ -1,5 +1,10 @@
 # Tinybar
 
+**Account** (Fleet fork):
+One Claude OAuth login managed by CLIProxyAPI.
+Its stable ID scopes limit pins and alerts independently of its display label.
+Local Usage Records remain Provider-wide.
+
 A macOS menu bar app that shows how much of each AI coding subscription is used up, how many tokens were used over time, and what that usage would have cost at API prices.
 
 ## Language

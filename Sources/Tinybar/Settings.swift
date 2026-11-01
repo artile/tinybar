@@ -17,6 +17,14 @@ final class Settings {
         didSet { defaults.set(hidePercentage, forKey: "hidePercentage") }
     }
 
+    var claudeProxyEnabled: Bool {
+        didSet { defaults.set(claudeProxyEnabled, forKey: "claudeProxyEnabled") }
+    }
+
+    var claudeProxyURL: String {
+        didSet { defaults.set(claudeProxyURL, forKey: "claudeProxyURL") }
+    }
+
     var notificationsEnabled: Bool {
         didSet { defaults.set(notificationsEnabled, forKey: "notificationsEnabled") }
     }
@@ -32,6 +40,8 @@ final class Settings {
         defaults.register(defaults: ["notificationsEnabled": true, "hidePercentage": false])
         pinnedLimit = defaults.string(forKey: "pinnedLimit")
         hidePercentage = defaults.bool(forKey: "hidePercentage")
+        claudeProxyEnabled = defaults.bool(forKey: "claudeProxyEnabled")
+        claudeProxyURL = defaults.string(forKey: "claudeProxyURL") ?? "http://127.0.0.1:18767"
         notificationsEnabled = defaults.bool(forKey: "notificationsEnabled")
         launchAtLogin = SMAppService.mainApp.status == .enabled
 
