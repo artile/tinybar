@@ -4,6 +4,13 @@ Tinybar Fleet shows each enabled Claude OAuth account from CLIProxyAPI as a sepa
 Each account has its own limits, pin, stale state, and alerts.
 The app keeps the same five-minute poll interval.
 
+Fleet shows each Claude account's weekly percentage left in the menu bar by default.
+The indicators follow the card order and use labels such as `1:62%` and `2:35%`.
+Hover over the indicators to see the account names.
+A missing or stale weekly reading shows `—`.
+Turn off **Show each weekly limit in menu bar** to use one pinned or Auto limit.
+Clicking a limit to pin it also returns to single-limit mode.
+
 ## Data flow
 
 ```text
@@ -111,6 +118,7 @@ python3 -m unittest discover -s Bridge -v
 
 Use `--snapshot out.png --page claude --redact-projects` for screenshots without account labels or project names.
 Add `--limits-only` to skip local history import during a limits snapshot.
+Add `--weekly-menubar` to render the live weekly menu indicators in light and dark themes.
 See [the validation results](fleet-validation.md) for the tested version.
 
 ## Remove

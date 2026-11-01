@@ -1,6 +1,7 @@
 # Fleet validation, 2026-11-01
 
 Platform: macmax, macOS 26.4.1, Apple Silicon.
+The first results below apply to version `0.7.0-fleet.1`.
 
 - All 169 Swift tests passed, including seven new account tests.
 - All ten Python bridge tests passed.
@@ -21,3 +22,15 @@ The tests verify pin and alert logic. They do not prove notification delivery th
 
 The account with HTTP 401 needs a renewed login in CLIProxyAPI.
 The fork does not change or refresh that login.
+
+## Weekly menu update, 0.7.0-fleet.2
+
+- All 172 Swift tests passed, including three new weekly menu tests.
+- The universal arm64 and x86_64 build passed.
+- Native light and dark menu images showed two separate account indicators.
+- The current feed showed one paused account and one fresh weekly reading.
+- The paused account showed `—`, with an orange status light.
+- The fresh account showed its weekly percentage left.
+- Tests checked weekly selection, model-specific exclusion, missing readings, stale readings, and both account positions.
+- The installed app uses this mode by default for Claude proxy accounts.
+- Selecting a single pinned limit leaves weekly mode.

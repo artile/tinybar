@@ -20,6 +20,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         var hidePercent: Bool
         var dark: Bool
         var alert: Incident.Severity?
+        var weekly: [ClaudeWeeklyMenuItem]
     }
 
     init(model: AppModel) {
@@ -72,9 +73,16 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             stale: stale,
             hidePercent: model.settings.hidePercentage,
             dark: button.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua,
-            alert: model.disruption?.severity)
+            alert: model.disruption?.severity,
+            weekly: model.claudeWeeklyMenuItems)
         var tip = pinned.map { "\($0.0.displayName) \($0.1.title): \(Int($0.1.remainingPercent.rounded()))% left" }
         if let account = model.selectedLimit?.accountName { tip = tip.map { "\(account)\n\($0)" } }
+        if !key.weekly.isEmpty {
+            tip = key.weekly.enumerated().map { index, item in
+                let reading = item.percent.map { "\($0)% left" } ?? (item.stale ? "unavailable, open Claude accounts for details" : "not reported")
+                return "Claude \(index + 1) · \(item.label)\nWeekly: \(reading)"
+            }.joined(separator: "\n\n")
+        }
         if let incident = model.disruption {
             tip = [tip, "\(incident.provider.displayName): \(incident.title)"].compactMap { $0 }.joined(separator: "\n")
         }
@@ -87,14 +95,18 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
 
         // Ring and percentage are drawn as one image: a titled status item gets wider padding
         // than an icon-only one, which left a visible gap to the neighbouring icon.
-        button.image = RingIcon.image(
-            fraction: key.percent.map { Double($0) / 100 },
-            label: key.hidePercent ? nil : key.percent.map { "\($0)%" },
-            tint: key.stale ? nil : key.provider.flatMap(RingIcon.tint),
-            dark: key.dark,
-            alert: key.alert?.nsColor)
+        if key.weekly.isEmpty {
+            button.image = RingIcon.image(
+                fraction: key.percent.map { Double($0) / 100 },
+                label: key.hidePercent ? nil : key.percent.map { "\($0)%" },
+                tint: key.stale ? nil : key.provider.flatMap(RingIcon.tint),
+                dark: key.dark,
+                alert: key.alert?.nsColor)
+        } else {
+            button.image = RingIcon.weeklyAccounts(key.weekly, hidePercent: key.hidePercent, dark: key.dark, alert: key.alert?.nsColor)
+        }
         button.title = ""
-        button.appearsDisabled = stale
+        button.appearsDisabled = key.weekly.isEmpty ? stale : false
     }
 
     @objc private func togglePopover() {
@@ -116,6 +128,27 @@ enum RingIcon {
     static let ringSize: CGFloat = 14
     static let spacing: CGFloat = 3
     static let font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize - 1, weight: .regular)
+
+    /// One ring per account, in the same order as the account cards. Hover names each account.
+    static func weeklyAccounts(_ items: [ClaudeWeeklyMenuItem], hidePercent: Bool, dark: Bool, alert: NSColor? = nil) -> NSImage {
+        let images = items.enumerated().map { index, item in
+            image(fraction: item.percent.map { Double($0) / 100 },
+                  label: hidePercent ? nil : "\(index + 1):\(item.percent.map { "\($0)%" } ?? "—")",
+                  tint: item.percent == nil ? nil : tint(.claude), dark: dark,
+                  alert: item.stale ? .systemOrange : (index == 0 ? alert : nil))
+        }
+        let gap: CGFloat = 10
+        let height = images.map(\.size.height).max() ?? ringSize
+        let width = images.reduce(CGFloat(0)) { $0 + $1.size.width } + gap * CGFloat(max(0, images.count - 1))
+        return NSImage(size: NSSize(width: max(ringSize, width), height: height), flipped: false) { _ in
+            var x: CGFloat = 0
+            for image in images {
+                image.draw(in: NSRect(x: x, y: (height - image.size.height) / 2, width: image.size.width, height: image.size.height))
+                x += image.size.width + gap
+            }
+            return true
+        }
+    }
 
     /// Colour stops for the arc, clockwise from the top. nil keeps it monochrome.
     enum Tint {

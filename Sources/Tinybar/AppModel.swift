@@ -19,6 +19,10 @@ final class AppModel {
     private(set) var providers: [ProviderID: ProviderState] = [:]
     private(set) var claudeAccounts: [ClaudeProxyAccount] = []
     var usesClaudeProxy: Bool { settings.claudeProxyEnabled }
+    var showsClaudeWeeklyMenu: Bool { usesClaudeProxy && settings.showClaudeWeeklyMenu && providers[.claude] != nil }
+    var claudeWeeklyMenuItems: [ClaudeWeeklyMenuItem] {
+        showsClaudeWeeklyMenu ? claudeAccounts.map(ClaudeWeeklyMenuItem.init) : []
+    }
     private var claudeSourceRevision = 0
     /// Keep Retry-After and the last attempt when a Provider is toggled off and on.
     private var disabledProviders: [ProviderID: ProviderState] = [:]
@@ -446,8 +450,10 @@ final class AppModel {
     var isAuto: Bool { selectedLimit == nil || selectedLimit?.key != settings.pinnedLimit }
 
     func pin(_ provider: ProviderID, _ window: LimitWindow, accountID: String? = nil) {
+        let wasWeeklyMode = showsClaudeWeeklyMenu
+        settings.showClaudeWeeklyMenu = false
         let key = LimitSelection.key(provider: provider, accountID: accountID, windowID: window.id)
-        settings.pinnedLimit = settings.pinnedLimit == key && !isAuto ? nil : key
+        settings.pinnedLimit = !wasWeeklyMode && settings.pinnedLimit == key && !isAuto ? nil : key
     }
 
     func isPinned(_ provider: ProviderID, _ window: LimitWindow, accountID: String? = nil) -> Bool {

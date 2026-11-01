@@ -62,6 +62,25 @@ enum PopoverSnapshot {
                 exit(0)
             }
             await model.refresh(force: true)
+            if args.contains("--weekly-menubar") {
+                let items = model.claudeWeeklyMenuItems
+                guard !items.isEmpty else { fail("No Claude proxy accounts for the weekly menu bar.") }
+                for dark in [false, true] {
+                    let icon = RingIcon.weeklyAccounts(items, hidePercent: model.settings.hidePercentage, dark: dark)
+                    let scale: CGFloat = 4, pad: CGFloat = 8
+                    let size = NSSize(width: (icon.size.width + 2 * pad) * scale, height: (icon.size.height + 2 * pad) * scale)
+                    let canvas = NSImage(size: size, flipped: false) { rect in
+                        (dark ? NSColor(white: 0.16, alpha: 1) : NSColor(white: 0.93, alpha: 1)).setFill()
+                        rect.fill()
+                        icon.draw(in: NSRect(x: pad * scale, y: pad * scale, width: icon.size.width * scale, height: icon.size.height * scale))
+                        return true
+                    }
+                    guard let tiff = canvas.tiffRepresentation else { fail("Could not render the weekly menu bar.") }
+                    write(NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]),
+                          to: URL(fileURLWithPath: out.deletingPathExtension().path + (dark ? ".weekly.dark.png" : ".weekly.png")))
+                }
+                exit(0)
+            }
             // `--update 0.5.0[:preparing|:failed]` shows the update pill.
             if let u = args.firstIndex(of: "--update"), u + 1 < args.count {
                 let parts = args[u + 1].split(separator: ":").map(String.init)

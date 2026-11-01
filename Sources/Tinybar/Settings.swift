@@ -25,6 +25,10 @@ final class Settings {
         didSet { defaults.set(claudeProxyURL, forKey: "claudeProxyURL") }
     }
 
+    var showClaudeWeeklyMenu: Bool {
+        didSet { defaults.set(showClaudeWeeklyMenu, forKey: "showClaudeWeeklyMenu") }
+    }
+
     var notificationsEnabled: Bool {
         didSet { defaults.set(notificationsEnabled, forKey: "notificationsEnabled") }
     }
@@ -37,11 +41,12 @@ final class Settings {
     }
 
     init() {
-        defaults.register(defaults: ["notificationsEnabled": true, "hidePercentage": false])
+        defaults.register(defaults: ["notificationsEnabled": true, "hidePercentage": false, "showClaudeWeeklyMenu": true])
         pinnedLimit = defaults.string(forKey: "pinnedLimit")
         hidePercentage = defaults.bool(forKey: "hidePercentage")
         claudeProxyEnabled = defaults.bool(forKey: "claudeProxyEnabled")
         claudeProxyURL = defaults.string(forKey: "claudeProxyURL") ?? "http://127.0.0.1:18767"
+        showClaudeWeeklyMenu = defaults.bool(forKey: "showClaudeWeeklyMenu")
         notificationsEnabled = defaults.bool(forKey: "notificationsEnabled")
         launchAtLogin = SMAppService.mainApp.status == .enabled
 

@@ -479,7 +479,7 @@ private struct ProxyClaudePage: View {
                             ForEach(snapshot.windows) { window in
                                 WindowRow(window: window, provider: .claude,
                                           runOut: account.error == nil ? window.runOutTime(asOf: snapshot.fetchedAt) : nil,
-                                          pinned: model.isPinned(.claude, window, accountID: account.id),
+                                          pinned: !model.showsClaudeWeeklyMenu && model.isPinned(.claude, window, accountID: account.id),
                                           auto: model.isAuto, dimmed: account.error != nil) {
                                     model.pin(.claude, window, accountID: account.id)
                                 }
@@ -516,7 +516,7 @@ private struct ProxyAccountOverview: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 5) {
                     Text("Claude").font(.system(size: 14, weight: .semibold))
-                    if model.selectedLimit?.accountID == account.id {
+                    if !model.showsClaudeWeeklyMenu && model.selectedLimit?.accountID == account.id {
                         Image(systemName: "pin.fill").font(.system(size: 9)).foregroundStyle(.tertiary)
                     }
                 }
@@ -1026,6 +1026,9 @@ private struct SettingsPage: View {
                     Text("Use CLIProxyAPI accounts")
                 }
                 if settings.claudeProxyEnabled {
+                    SettingsToggle(isOn: $settings.showClaudeWeeklyMenu) {
+                        Text("Show each weekly limit in menu bar")
+                    }
                     Divider().padding(.leading, 14)
                     TextField("Account service URL", text: $settings.claudeProxyURL)
                         .textFieldStyle(.roundedBorder).font(.system(size: 11))
@@ -1058,7 +1061,7 @@ private struct SettingsPage: View {
                 SettingsToggle(isOn: Binding(
                     get: { !settings.hidePercentage }, set: { settings.hidePercentage = !$0 }))
                 {
-                    Text("Show percentage in menu bar")
+                    Text("Show percentages in menu bar")
                 }
                 SettingsToggle(isOn: Binding(
                     get: { model.isAuto },
@@ -1070,6 +1073,7 @@ private struct SettingsPage: View {
                 {
                     Text("Show the limit closest to running out")
                 }
+                .disabled(model.showsClaudeWeeklyMenu)
             }
             HStack(spacing: 4) {
                 if let version = model.updater.current {
