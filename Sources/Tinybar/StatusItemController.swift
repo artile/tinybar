@@ -133,7 +133,7 @@ enum RingIcon {
     static func weeklyAccounts(_ items: [ClaudeWeeklyMenuItem], hidePercent: Bool, dark: Bool, alert: NSColor? = nil) -> NSImage {
         let images = items.enumerated().map { index, item in
             image(fraction: item.percent.map { Double($0) / 100 },
-                  label: hidePercent ? nil : "\(index + 1):\(item.percent.map { "\($0)%" } ?? "—")",
+                  label: hidePercent ? nil : (item.percent.map { "\($0)%" } ?? "—"),
                   tint: item.percent == nil ? nil : tint(.claude), dark: dark,
                   alert: item.stale ? .systemOrange : (index == 0 ? alert : nil))
         }

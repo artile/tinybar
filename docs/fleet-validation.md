@@ -42,3 +42,9 @@ The fork does not change or refresh that login.
 - Runtime status changes preserve the delay. A new HTTP 429 starts a new delay.
 - After deployment, both live Claude accounts returned fresh weekly limits through the Mac tunnel.
 - Tinybar restarted with weekly mode enabled. Native menu rendering showed both percentages.
+
+## Compact menu, 0.7.0-fleet.3
+
+- All 172 Swift tests passed. The universal arm64 and x86_64 build passed.
+- Weekly menu labels now show percentages without account number prefixes.
+- The client stores the preferred account order by stable ID.

@@ -223,7 +223,12 @@ final class AppModel {
         do {
             let accounts = try await ClaudeProxyClient(url: settings.claudeProxyURL).fetch()
             guard revision == claudeSourceRevision, usesClaudeProxy, providers[.claude] != nil else { return }
-            claudeAccounts = ClaudeProxyAccount.merging(accounts, previous: claudeAccounts)
+            let merged = ClaudeProxyAccount.merging(accounts, previous: claudeAccounts)
+            claudeAccounts = merged.enumerated().sorted {
+                let left = settings.claudeAccountOrder.firstIndex(of: $0.element.id) ?? Int.max
+                let right = settings.claudeAccountOrder.firstIndex(of: $1.element.id) ?? Int.max
+                return (left, $0.offset) < (right, $1.offset)
+            }.map(\.element)
             providers[.claude]?.error = nil
             providers[.claude]?.backoffUntil = nil
             if settings.notificationsEnabled {

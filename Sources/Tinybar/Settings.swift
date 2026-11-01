@@ -29,6 +29,10 @@ final class Settings {
         didSet { defaults.set(showClaudeWeeklyMenu, forKey: "showClaudeWeeklyMenu") }
     }
 
+    var claudeAccountOrder: [String] {
+        didSet { defaults.set(claudeAccountOrder, forKey: "claudeAccountOrder") }
+    }
+
     var notificationsEnabled: Bool {
         didSet { defaults.set(notificationsEnabled, forKey: "notificationsEnabled") }
     }
@@ -47,6 +51,7 @@ final class Settings {
         claudeProxyEnabled = defaults.bool(forKey: "claudeProxyEnabled")
         claudeProxyURL = defaults.string(forKey: "claudeProxyURL") ?? "http://127.0.0.1:18767"
         showClaudeWeeklyMenu = defaults.bool(forKey: "showClaudeWeeklyMenu")
+        claudeAccountOrder = defaults.stringArray(forKey: "claudeAccountOrder") ?? []
         notificationsEnabled = defaults.bool(forKey: "notificationsEnabled")
         launchAtLogin = SMAppService.mainApp.status == .enabled
 

@@ -5,8 +5,9 @@ Each account has its own limits, pin, stale state, and alerts.
 The app keeps the same five-minute poll interval.
 
 Fleet shows each Claude account's weekly percentage left in the menu bar by default.
-The indicators follow the card order and use labels such as `1:62%` and `2:35%`.
+The indicators follow the card order and show only percentages, such as `62%` and `35%`.
 Hover over the indicators to see the account names.
+The client can preserve a preferred account order by stable account ID.
 A missing or stale weekly reading shows `—`.
 Turn off **Show each weekly limit in menu bar** to use one pinned or Auto limit.
 Clicking a limit to pin it also returns to single-limit mode.
